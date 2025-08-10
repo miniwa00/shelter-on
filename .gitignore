@@ -11,3 +11,5 @@
 
 preprocess/
 __pycache__/
+
+settings.json

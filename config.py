@@ -54,7 +54,7 @@ async () => {
 APP_CONFIG = {
     "title": "무더위 쉼터 찾기",
     "theme": "soft",
-    "share": True,
+    "share": False,
     "server_name": "0.0.0.0",
     "server_port": 7860,
 }

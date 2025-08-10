@@ -1,8 +1,6 @@
 import pandas as pd
 import folium
-import numpy as np
 from math import radians, cos, sin, asin, sqrt
-import re
 import json
 
 
@@ -13,7 +11,6 @@ def load_data():
     # 숫자형 컬럼들
     numeric_columns = {
         "시설년도": "Int64",  # nullable integer
-        "시설면적": "float64",
         "이용가능인원": "Int64",  # nullable integer
         "경도": "float64",
         "위도": "float64",
@@ -25,6 +22,16 @@ def load_data():
         if col in df.columns:
             # 결측값이나 잘못된 데이터 처리
             df[col] = pd.to_numeric(df[col], errors="coerce").astype(dtype)
+
+    # 시설면적 특별 처리 (천 단위 구분자 제거 후 변환)
+    if "시설면적" in df.columns:
+        # 문자열로 변환 후 천 단위 구분자 제거
+        df["시설면적"] = df["시설면적"].astype(str)
+        df["시설면적"] = df["시설면적"].str.replace(",", "")
+        # 숫자로 변환
+        df["시설면적"] = pd.to_numeric(df["시설면적"], errors="coerce").astype(
+            "float64"
+        )
 
     # 문자열 컬럼들 (명시적으로 string 타입으로 변환)
     string_columns = [
@@ -310,12 +317,26 @@ def create_map(
     # 쉼터 마커 추가
     for idx, row in filtered_df.iterrows():
         if pd.notna(row["위도"]) and pd.notna(row["경도"]):
+            # 면적 정보 처리 (NaN인 경우 "정보없음"으로 표시)
+            area_info = row["시설면적"]
+            if pd.isna(area_info):
+                area_display = f"정보없음 ({row['시설면적_분류']})"
+            else:
+                area_display = f"{area_info}㎡ ({row['시설면적_분류']})"
+
+            # 수용인원 정보 처리 (NaN인 경우 "정보없음"으로 표시)
+            capacity_info = row["이용가능인원"]
+            if pd.isna(capacity_info):
+                capacity_display = f"정보없음 ({row['이용가능인원_분류']})"
+            else:
+                capacity_display = f"{capacity_info}명 ({row['이용가능인원_분류']})"
+
             popup_text = f"""
             <b>{row['쉼터명칭']}</b><br>
             시설구분: {row['시설구분2']}<br>
             주소: {row['도로명주소']}<br>
-            면적: {row['시설면적']}㎡ ({row['시설면적_분류']})<br>
-            수용인원: {row['이용가능인원']}명 ({row['이용가능인원_분류']})<br>
+            면적: {area_display}<br>
+            수용인원: {capacity_display}<br>
             선풍기: {row['선풍기_여부']}<br>
             에어컨: {row['에어컨_여부']}<br>
             야간운영: {row['야간운영여부']}<br>
@@ -368,18 +389,54 @@ def get_nearby_shelters(
         if pd.notna(row["위도"]) and pd.notna(row["경도"]):
             distance = haversine(user_lon, user_lat, row["경도"], row["위도"])
             if distance <= 1.0:  # 1km 이내
+                # 면적 정보 처리 (NaN인 경우 "정보없음"으로 표시)
+                area_info = row["시설면적"]
+                if pd.isna(area_info):
+                    area_display = f"정보없음 ({row['시설면적_분류']})"
+                else:
+                    area_display = f"{area_info}㎡ ({row['시설면적_분류']})"
+
+                # 수용인원 정보 처리 (NaN인 경우 "정보없음"으로 표시)
+                capacity_info = row["이용가능인원"]
+                if pd.isna(capacity_info):
+                    capacity_display = f"정보없음 ({row['이용가능인원_분류']})"
+                else:
+                    capacity_display = f"{capacity_info}명 ({row['이용가능인원_분류']})"
+
+                # 실시간 온도 및 사용자 수 처리
+                current_temp = row.get("current_temperature")
+                current_occupancy = row.get("current_occupancy")
+
+                # 온도 정보 처리 (NaN인 경우 "정보없음"으로 표시)
+                if pd.isna(current_temp):
+                    temp_display = "정보없음"
+                else:
+                    temp_display = f"{current_temp}°C"
+
+                    # 사용자 수 정보 처리 (NaN인 경우 "정보없음"으로 표시)
+                if pd.isna(current_occupancy):
+                    occupancy_display = "정보없음"
+                else:
+                    occupancy_display = f"{current_occupancy}명"
+
+                # 운영 상태 판단 (온도 30도 이상이고 사용자 수 0이면 미운영)
+                is_operating = True
+                if not pd.isna(current_temp) and not pd.isna(current_occupancy):
+                    if current_temp >= 30 and current_occupancy == 0:
+                        is_operating = False
+
                 nearby_shelters.append(
                     {
                         "name": row["쉼터명칭"],
                         "type": row["시설구분2"],
                         "address": row["도로명주소"],
-                        "area": f"{row['시설면적']}㎡ ({row['시설면적_분류']})",
-                        "capacity": f"{row['이용가능인원']}명 ({row['이용가능인원_분류']})",
+                        "area": area_display,
+                        "capacity": capacity_display,
                         "fan": row["선풍기_여부"],
                         "ac": row["에어컨_여부"],
-                        "night": row["야간운영여부"],
-                        "holiday": row["휴일운영여부"],
-                        "sleep": row["숙박가능여부"],
+                        "current_temp": temp_display,
+                        "current_occupancy": occupancy_display,
+                        "is_operating": is_operating,
                         "distance": round(distance, 2),
                         "lat": row["위도"],
                         "lon": row["경도"],
@@ -398,16 +455,29 @@ def get_nearby_shelters(
         # 카카오지도 길찾기 링크 생성
         kakao_directions_url = f"https://map.kakao.com/link/from/현재위치,{user_lat},{user_lon}/to/{shelter['name']},{shelter['lat']},{shelter['lon']}"
 
+        # 운영 상태에 따른 배경색 설정
+        if shelter["is_operating"]:
+            bg_color = "#d4edda"  # 밝은 초록색 (운영 중)
+            border_color = "#28a745"
+            status_text = "<div style='background-color: #28a745; color: white; padding: 5px 10px; border-radius: 4px; margin-bottom: 10px; text-align: center; font-weight: bold;'>✅ 운영 중</div>"
+        else:
+            bg_color = "#f8d7da"  # 밝은 빨간색 (미운영)
+            border_color = "#dc3545"
+            status_text = "<div style='background-color: #dc3545; color: white; padding: 5px 10px; border-radius: 4px; margin-bottom: 10px; text-align: center; font-weight: bold;'>🚫 미운영 중</div>"
+
         cards_html += f"""
-        <div style='border: 1px solid #ddd; margin: 10px; padding: 15px; border-radius: 8px; background-color: #f9f9f9;'>
+        <div style='border: 3px solid {border_color}; margin: 10px; padding: 15px; border-radius: 8px; background-color: {bg_color}; box-shadow: 0 4px 8px rgba(0,0,0,0.1);'>
             <h3 style='margin-top: 0; color: #2c3e50;'>{shelter['name']}</h3>
+            {status_text}
             <p><strong>거리:</strong> {shelter['distance']}km</p>
             <p><strong>시설구분:</strong> {shelter['type']}</p>
             <p><strong>주소:</strong> {shelter['address']}</p>
             <p><strong>면적:</strong> {shelter['area']}</p>
             <p><strong>수용인원:</strong> {shelter['capacity']}</p>
             <p><strong>편의시설:</strong> 선풍기 {shelter['fan']}, 에어컨 {shelter['ac']}</p>
-            <p><strong>운영정보:</strong> 야간 {shelter['night']}, 휴일 {shelter['holiday']}, 숙박 {shelter['sleep']}</p>
+            <h3 style='margin-top: 15px; margin-bottom: 10px; color: #e74c3c; font-size: 16px;'>실시간 운영 정보</h3>
+            <p><strong>현재 온도:</strong> {shelter['current_temp']}</p>
+            <p><strong>현재 사용자 수:</strong> {shelter['current_occupancy']}</p>
             <div style='margin-top: 10px; text-align: center;'>
                 <a href="{kakao_directions_url}" target="_blank" 
                    style='display: inline-block; padding: 8px 16px; background-color: #FEE500; color: #3C1E1E; 
@@ -458,6 +528,100 @@ def get_district_from_location(user_lat, user_lon):
         return most_common_district
 
     return "중구"  # 기본값
+
+
+# 나이와 이름 기반 적합한 쉼터 추천 함수
+def get_recommended_shelter(user_lat, user_lon, user_age, user_name):
+    """나이와 이름을 기반으로 가장 적합한 쉼터 추천"""
+    if not user_lat or not user_lon:
+        return "위치 정보를 입력해주세요.", None, None, None
+
+    if not user_age or not user_name:
+        return "나이와 이름을 입력해주세요.", None, None, None
+
+    try:
+        user_age = int(user_age)
+    except ValueError:
+        return "올바른 나이를 입력해주세요.", None, None, None
+
+    df = load_data()
+    df = preprocess_data(df)
+
+    # 운영 중인 쉼터만 필터링 (온도 30도 이상이고 사용자 수 0이면 제외)
+    operating_shelters = []
+    for idx, row in df.iterrows():
+        if pd.notna(row["위도"]) and pd.notna(row["경도"]):
+            current_temp = row.get("current_temperature")
+            current_occupancy = row.get("current_occupancy")
+
+            # 운영 상태 판단
+            is_operating = True
+            if not pd.isna(current_temp) and not pd.isna(current_occupancy):
+                if current_temp >= 30 and current_occupancy == 0:
+                    is_operating = False
+
+            if is_operating:
+                distance = haversine(user_lon, user_lat, row["경도"], row["위도"])
+                operating_shelters.append({"row": row, "distance": distance})
+
+    if not operating_shelters:
+        return "주변에 적합한 쉼터가 없습니다.", None, None, None
+
+    # 거리순 정렬
+    operating_shelters.sort(key=lambda x: x["distance"])
+
+    # 나이 기반 필터링
+    filtered_shelters = []
+    for shelter in operating_shelters:
+        row = shelter["row"]
+        facility_type = row["시설구분2"]
+
+        # 60대 이하인 경우 회원이용시설(경로당) 제외
+        if user_age <= 60 and "회원이용시설" in facility_type:
+            continue
+
+        filtered_shelters.append(shelter)
+
+    if not filtered_shelters:
+        return "주변에 적합한 쉼터가 없습니다.", None, None, None
+
+    # 가장 가까운 적합한 쉼터 선택
+    best_shelter = filtered_shelters[0]
+    row = best_shelter["row"]
+    distance = best_shelter["distance"]
+
+    # 면적 정보 처리
+    area_info = row["시설면적"]
+    if pd.isna(area_info):
+        area_display = f"정보없음 ({row['시설면적_분류']})"
+    else:
+        area_display = f"{area_info}㎡ ({row['시설면적_분류']})"
+
+    # 수용인원 정보 처리
+    capacity_info = row["이용가능인원"]
+    if pd.isna(capacity_info):
+        capacity_display = f"정보없음 ({row['이용가능인원_분류']})"
+    else:
+        capacity_display = f"{capacity_info}명 ({row['이용가능인원_분류']})"
+
+    # 실시간 온도 및 사용자 수 처리
+    current_temp = row.get("current_temperature")
+    current_occupancy = row.get("current_occupancy")
+
+    if pd.isna(current_temp):
+        temp_display = "정보없음"
+    else:
+        temp_display = f"{current_temp}°C"
+
+    if pd.isna(current_occupancy):
+        occupancy_display = "정보없음"
+    else:
+        occupancy_display = f"{current_occupancy}명"
+
+    # 추천 텍스트 생성
+    recommendation_text = f"{user_name} 님({user_age}세)에게 가장 적합한 쉼터는 {row['쉼터명칭']} 입니다. 현 위치로부터 {distance:.1f}km 거리에 있습니다. 현재 온도 {temp_display}, 현재 사용자 수 {occupancy_display}로 운영 중입니다."
+
+    return recommendation_text, row["쉼터명칭"], row["위도"], row["경도"]
 
 
 # 위치 정보 처리 함수 (자치구 자동 설정 포함)
