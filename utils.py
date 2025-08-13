@@ -619,7 +619,7 @@ def get_recommended_shelter(user_lat, user_lon, user_age, user_name):
         occupancy_display = f"{current_occupancy}명"
 
     # 추천 텍스트 생성
-    recommendation_text = f"{user_name} 님({user_age}세)에게 가장 적합한 쉼터는 {row['쉼터명칭']} 입니다. 현 위치로부터 {distance:.1f}km 거리에 있습니다. 현재 온도 {temp_display}, 현재 사용자 수 {occupancy_display}로 운영 중입니다."
+    recommendation_text = f"선생님께 가장 적합한 쉼터는 {row['쉼터명칭']} 입니다. 현 위치로부터 {distance:.1f}km 거리에 있습니다. 현재 온도 {temp_display}, 현재 사용자 수 {occupancy_display}로 운영 중입니다."
 
     return recommendation_text, row["쉼터명칭"], row["위도"], row["경도"]
 

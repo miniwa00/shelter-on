@@ -60,12 +60,10 @@ def create_interface():
         # 개인 맞춤 추천 섹션
         with gr.Row():
             with gr.Column(scale=1):
-                gr.Markdown("### 👤 개인 정보 입력")
-                user_name = gr.Textbox(
-                    label="이름", placeholder="이름을 입력하세요", lines=1
-                )
-                user_age = gr.Textbox(
-                    label="나이", placeholder="나이를 입력하세요 (예: 25)", lines=1
+                gr.Markdown("### 👤 맞춤 추천 설정")
+                is_elderly = gr.Checkbox(
+                    label="65세 이상",
+                    info="체크하면 경로당을 포함한 맞춤 쉼터를 추천합니다",
                 )
                 recommend_btn = gr.Button(
                     "🎯 맞춤 쉼터 추천받기", variant="primary", size="sm"
@@ -74,9 +72,9 @@ def create_interface():
             with gr.Column(scale=3):
                 gr.Markdown("### 🎯 맞춤 쉼터 추천")
                 recommendation_text = gr.Textbox(
-                    label="추천 결과",
-                    placeholder="이름과 나이를 입력하고 추천 버튼을 눌러주세요",
-                    lines=5,
+                    show_label=False,
+                    placeholder="65세 이상 여부를 선택하고 추천 버튼을 눌러주세요",
+                    lines=2,
                     interactive=False,
                 )
                 recommendation_directions_btn = gr.HTML(value="", visible=False)
@@ -189,9 +187,13 @@ def create_interface():
         )
 
         # 추천 버튼 이벤트 핸들러
-        def get_recommendation(lat, lon, age, name):
+        def get_recommendation(lat, lon, is_elderly):
+            # 65세 이상 여부에 따라 나이 설정
+            user_age = 65 if is_elderly else 25  # 65세 이상이면 65, 아니면 25
+            user_name = "사용자"  # 기본 이름
+
             recommendation_text, shelter_name, shelter_lat, shelter_lon = (
-                get_recommended_shelter(lat, lon, age, name)
+                get_recommended_shelter(lat, lon, user_age, user_name)
             )
 
             if shelter_name and shelter_lat and shelter_lon:
@@ -200,7 +202,7 @@ def create_interface():
 
                 # 카드 섹션과 동일한 스타일의 버튼 HTML 생성 (중앙 정렬)
                 button_html = f"""
-                <div style='margin-top: 5px; text-align: center; display: flex; justify-content: center;'>
+                <div style='text-align: center; display: flex; justify-content: center;'>
                     <a href="{kakao_directions_url}" target="_blank" 
                        style='display: inline-block; padding: 8px 16px; background-color: #FEE500; color: #3C1E1E; 
                               text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 14px;'>
@@ -214,7 +216,7 @@ def create_interface():
 
         recommend_btn.click(
             fn=get_recommendation,
-            inputs=[user_lat, user_lon, user_age, user_name],
+            inputs=[user_lat, user_lon, is_elderly],
             outputs=[recommendation_text, recommendation_directions_btn],
         )
 
