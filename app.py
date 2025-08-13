@@ -41,8 +41,19 @@ def create_interface():
     ac_options = filter_options["ac_options"]
     districts = filter_options["districts"]
 
-    with gr.Blocks(title=APP_CONFIG["title"], theme=gr.themes.Soft()) as demo:
-        gr.Markdown(UI_TEXT["main_title"])
+    with gr.Blocks(
+        title=APP_CONFIG["title"],
+        theme=gr.themes.Soft(),
+        css="""
+        .center-title {
+            text-align: center !important;
+            font-size: 2em !important;
+            font-weight: bold !important;
+            margin-bottom: 20px !important;
+        }
+        """,
+    ) as demo:
+        gr.Markdown(UI_TEXT["main_title"], elem_classes=["center-title"])
 
         # 위도, 경도를 숨겨진 상태로 관리
         user_lat = gr.State(value=DEFAULT_COORDINATES["latitude"])
@@ -60,17 +71,19 @@ def create_interface():
         # 개인 맞춤 추천 섹션
         with gr.Row():
             with gr.Column(scale=1):
-                gr.Markdown("### 👤 맞춤 추천 설정")
+                gr.Markdown("## 👤 맞춤 추천 설정")
+                gr.Markdown(
+                    "💡 **안내:** 아래 체크박스를 클릭하면 경로당을 포함한 맞춤 쉼터를 추천합니다!"
+                )
                 is_elderly = gr.Checkbox(
                     label="65세 이상",
-                    info="체크하면 경로당을 포함한 맞춤 쉼터를 추천합니다",
                 )
                 recommend_btn = gr.Button(
                     "🎯 맞춤 쉼터 추천받기", variant="primary", size="sm"
                 )
 
             with gr.Column(scale=3):
-                gr.Markdown("### 🎯 맞춤 쉼터 추천")
+                gr.Markdown("## 🎯 맞춤 쉼터 추천")
                 recommendation_text = gr.Textbox(
                     show_label=False,
                     placeholder="65세 이상 여부를 선택하고 추천 버튼을 눌러주세요",
@@ -202,7 +215,7 @@ def create_interface():
 
                 # 카드 섹션과 동일한 스타일의 버튼 HTML 생성 (중앙 정렬)
                 button_html = f"""
-                <div style='text-align: center; display: flex; justify-content: center;'>
+                <div style='margin-top: 10px; text-align: center; display: flex; justify-content: center;'>
                     <a href="{kakao_directions_url}" target="_blank" 
                        style='display: inline-block; padding: 8px 16px; background-color: #FEE500; color: #3C1E1E; 
                               text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 14px;'>
