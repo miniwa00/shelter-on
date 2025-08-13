@@ -450,7 +450,7 @@ def get_nearby_shelters(
         return "주변 1km 내에 조건에 맞는 쉼터가 없습니다."
 
     # HTML 카드 형태로 생성
-    cards_html = "<div style='max-height: 800px; overflow-y: auto;'>"
+    cards_html = "<div style='max-height: 805px; overflow-y: auto;'>"
     for shelter in nearby_shelters:
         # 카카오지도 길찾기 링크 생성
         kakao_directions_url = f"https://map.kakao.com/link/from/현재위치,{user_lat},{user_lon}/to/{shelter['name']},{shelter['lat']},{shelter['lon']}"
